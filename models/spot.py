@@ -1,9 +1,10 @@
-from typing import Tuple
-from models.stock_prices import StockPrices
-from models.vector2 import Vector2
+from typing import List
 
 class Spot:
-    def __init__(self, spot_id: int, position: Vector2, stock_prices: StockPrices):
-        self.spot_id = spot_id
-        self.position = position
-        self.stock_prices = stock_prices # 銘柄ごとの株価情報
+    def __init__(self, spot_id: int):
+        self.id = spot_id
+        # 各株IDに対応する株価を格納
+        self.stock_prices: List[float] = []
+
+    def to_dict(self):
+        return {"id": self.id, "stock_prices": self.stock_prices}

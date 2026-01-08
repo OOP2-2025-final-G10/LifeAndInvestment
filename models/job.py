@@ -1,5 +1,7 @@
 class Job:
-    def __init__(self, job_id: int, title: str, salary: int):
-        self.job_id = job_id
-        self.title = title
+    def __init__(self, name: str, salary: int):
+        self.name = name
         self.salary = salary
+
+    def to_dict(self):
+        return {"name": self.name, "salary": self.salary}
