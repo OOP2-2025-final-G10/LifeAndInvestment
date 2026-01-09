@@ -248,36 +248,88 @@ def roulette_stream():
     user = User.from_row(user_row)
 
     def event_stream():
-        nonlocal user, db
+        try:
+            for data in RouletteService.spin_stream():
+                if isinstance(data, float):
+                    yield f"data:{data}\n\n"
+                    continue
 
-        for data in RouletteService.spin_stream():
-            # 回転中
-            if isinstance(data, float):
-                yield f"data:{data}\n\n"
-                continue
-
-            # 結果確定
-            if data.startswith("RESULT"):
+                # RESULT
                 step = int(data.split(":")[1])
 
-                # ① spot_id 更新
+                # ① 移動
                 user.spot_id += step
                 user.save(db)
 
-                # ② マス目イベント処理
+                # ② マス目イベント
                 SpotEventService.handle(user, db)
 
-                # ③ 次プレイヤーへターン移動
+                # ③ ターン移動
                 TurnService.next_turn(db)
 
                 db.commit()
-                db.close()
 
                 yield f"data:{data}\n\n"
                 return
+        finally:
+            db.close()
 
     return Response(event_stream(), mimetype="text/event-stream")
 
+@app.route("/api/users")
+def api_users():
+    db = get_db()
+    rows = db.execute("""
+        SELECT id, name, spot_id
+        FROM users
+        ORDER BY rowid ASC
+    """).fetchall()
+    db.close()
+
+    return {
+        "users": [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "spot_id": r["spot_id"]
+            }
+            for r in rows
+        ]
+    }
+
+@app.route("/api/user/<user_id>")
+def api_user_detail(user_id):
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+    db.close()
+
+    if not row:
+        return {"error": "not found"}, 404
+
+    user = User.from_row(row)
+    return user.to_dict()
+
+@app.route("/api/game_state")
+def api_game_state():
+    db = get_db()
+    row = db.execute("""
+        SELECT status, turn_user_id, turn_number
+        FROM game_state
+        WHERE id = 1
+    """).fetchone()
+    db.close()
+
+    if not row:
+        return {"error": "game_state not found"}, 404
+
+    return {
+        "status": row["status"],
+        "turn_user_id": row["turn_user_id"],
+        "turn_number": row["turn_number"]
+    }
 
 
 if __name__ == '__main__':
