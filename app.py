@@ -1,17 +1,87 @@
 import uuid
 from flask import Flask, request, redirect, url_for, render_template, session
 from models.user import User
+from models.db import get_db
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
 users = {}
 
+def init_db():
+    db = get_db()
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            money INTEGER NOT NULL,
+            job TEXT,
+            spot_id INTEGER NOT NULL DEFAULT 0,
+            is_ready INTEGER DEFAULT 0
+        )
+    """)
+
+    db.execute("""
+        INSERT OR REPLACE INTO game_state (
+            id, status,
+            turn_user_id,
+            turn_number
+        )
+        VALUES (1, 'waiting', NULL, 0)
+    """)
+
+    db.execute("""
+        INSERT OR IGNORE INTO game_state (id, status)
+        VALUES (1, 'waiting')
+    """)
+
+    db.commit()
+    db.close()
+
+
+init_db()
+
+#セッションリセット用
+@app.route("/reset")
+def reset_session():
+    # セッション（このクライアントの cookie）をクリア
+    session.clear()
+
+    # DB のリセット：users を削除し、game_state を初期状態に戻す
+    db = get_db()
+    db.execute("DELETE FROM users")
+    # game_state を初期状態に戻す（存在しなければ作る）
+    db.execute("DELETE FROM game_state")
+    db.execute("INSERT OR REPLACE INTO game_state (id, status) VALUES (1, 'waiting')")
+    db.commit()
+    db.close()
+
+    return redirect("/")
+
+
 #参加画面
 @app.route("/", methods=["GET"])
 def index():
     is_registered = "user_id" in session
-    return render_template("index.html", is_registered=is_registered)
+    username = None
+
+    if is_registered:
+        db = get_db()
+        user = db.execute(
+            "SELECT name FROM users WHERE id = ?",
+            (session["user_id"],)
+        ).fetchone()
+        db.close()
+        if user:
+            username = user["name"]
+
+    return render_template(
+        "setup.html",
+        is_registered=is_registered,
+        username=username
+    )
+
 
 #ユーザー参加処理
 @app.route("/", methods=["POST"])
@@ -24,29 +94,116 @@ def join():
         return "", 400
 
     user_id = str(uuid.uuid4())
-    user = User(
-        id=user_id,
-        name=username,
-        money=50000,
-        holdings={},
-        job=None
-    )
 
-    users[user_id] = user
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO users (id, name, money, job, spot_id)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+    (user_id, username, 50000, None, 0)
+)
+    db.commit()
+    db.close()
+
     session["user_id"] = user_id
-
     return "", 204
 
 #ゲーム画面 未登録ユーザーであれば参加画面へリダイレクト
 @app.route("/game")
 def game():
     user_id = session.get("user_id")
-
-    if not user_id or user_id not in users:
+    if not user_id:
         return redirect(url_for("index"))
 
-    user = users[user_id]
-    return render_template("game.html", user=user)
+    db = get_db()
+
+    user_row = db.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+
+    if not user_row:
+        db.close()
+        return redirect(url_for("index"))
+
+    state_row = db.execute(
+        "SELECT status FROM game_state WHERE id = 1"
+    ).fetchone()
+
+    is_my_turn = (state_row["turn_user_id"] == user_id)
+
+    db.close()
+
+    if not state_row or state_row["status"] != "playing":
+        return redirect(url_for("index"))
+
+    user = User.from_row(user_row)
+    return render_template("game.html", user=user, is_my_turn=is_my_turn)
+
+
+
+
+@app.route("/members")
+def members():
+    db = get_db()
+    users = db.execute("SELECT name, is_ready FROM users").fetchall()
+    state_row = db.execute("SELECT status FROM game_state WHERE id = 1").fetchone()
+    db.close()
+
+    status = state_row["status"] if state_row else "waiting"
+
+    # セッションに user_id があるかで登録済み判定を返す
+    is_registered = "user_id" in session and session.get("user_id") is not None
+
+    return {
+        "members": [
+            {"name": u["name"], "ready": bool(u["is_ready"])}
+            for u in users
+        ],
+        "status": status,
+        "is_registered": bool(is_registered)
+    }
+
+
+
+@app.route("/ready", methods=["POST"])
+def ready():
+    user_id = session.get("user_id")
+    if not user_id:
+        return "", 403
+
+    db = get_db()
+
+    # 自分を ready にする
+    db.execute(
+        "UPDATE users SET is_ready = 1 WHERE id = ?",
+        (user_id,)
+    )
+
+    # 全員が ready か確認
+    total = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    ready = db.execute(
+        "SELECT COUNT(*) FROM users WHERE is_ready = 1"
+    ).fetchone()[0]
+
+    if total > 0 and total == ready:
+        first_user = db.execute(
+            "SELECT id FROM users ORDER BY rowid ASC LIMIT 1"
+        ).fetchone()
+
+        db.execute("""
+            UPDATE game_state
+            SET status = 'playing',
+                turn_user_id = ?,
+                turn_number = 1
+            WHERE id = 1
+        """, (first_user["id"],))
+
+    db.commit()
+    db.close()
+
+    return "", 204
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
