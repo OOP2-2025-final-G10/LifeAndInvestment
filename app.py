@@ -260,7 +260,6 @@ def roulette_stream():
 
                 # ① 移動
                 user.spot_id += step
-                user.save(db)
 
                 # ② マス目イベント
                 SpotEventService.handle(user, db)
@@ -268,6 +267,7 @@ def roulette_stream():
                 # ③ ターン移動
                 TurnService.next_turn(db)
 
+                user.save(db)
                 db.commit()
 
                 yield f"data:{data}\n\n"
