@@ -132,6 +132,7 @@ def game():
     ).fetchone()
 
     if not user_row:
+        session.clear()
         db.close()
         return redirect(url_for("index"))
 
