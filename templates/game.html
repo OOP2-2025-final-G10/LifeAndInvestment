@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>人生ゲーム - プレイ</title>
-   <link rel="stylesheet" href="{{ url_for('static', filename='base-style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='base-style.css') }}">
 </head>
 
 <body class="game-page">
 <div class="game-container">
 
     <div class="game-main">
-        <div class="map-area box-border">
-            マップ
+        <div class="map-area">
             <div class="zoom-btns">
                 <button>+</button>
                 <button>-</button>
@@ -27,23 +26,25 @@
     </div>
 
     <aside class="info-sidebar box-border">
-        <details>
-            <summary>ユーザー</summary>
-            <ul>
-                <li><button type="button" class="user-link" data-id="101">田中 太郎</button></li>
-                <li><button type="button" class="user-link" data-id="102">佐藤 花子</button></li>
+        <details open>
+            <summary style="cursor: pointer; font-weight: bold; font-size: 1.2rem;">ユーザー</summary>
+            <ul style="list-style: none; padding-left: 10px; margin-top: 10px;">
+                {% for uid, uinfo in users.items() %}
+                <li>
+                    <button type="button" class="user-link" onclick="showUserInfo('{{ uid }}')">
+                        {{ uinfo.name }}
+                    </button>
+                </li>
+                {% endfor %}
             </ul>
         </details>
-        <ul class="status-info">
-            <li>・ ゴールまでの距離：</li>
-            <li>・ 職業：</li>
-            <li>・ 所持金：</li>
-            <li>・ 配偶者の有無：</li>
-            <li>・ 子供の数：</li>
-            <li>・ 持ち会社：</li>
+        
+        <ul class="status-info" id="userInfo">
+            <li>・ 名前：<span id="stat-name">-</span></li>
+            <li>・ 所持金：<span id="stat-money">-</span></li>
+            <li>・ 職業：<span id="stat-job">-</span></li>
         </ul>
     </aside>
-
 
 </div>
 </body>
