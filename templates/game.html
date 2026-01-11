@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>人生ゲーム - プレイ</title>
-   <link rel="stylesheet" href="{{ url_for('static', filename='base-style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='base-style.css') }}">
 </head>
 
 <body class="game-page">
     <div class="game-container">
-
         <div class="game-main">
-            <div class="map-area box-border">
+            <div class="map-area">
                 マップ
                 <div class="zoom-btns">
                     <button>+</button>
@@ -47,11 +46,11 @@
                 <summary>ユーザー</summary>
                 <ul id="userList"></ul>
             </details>
-            <ul class="status-info">
-                <li>ユーザー：</li>
+            <ul class="status-info" id="userInfo">
+                <li>名前：<span id="stat-name">-</span></li>
                 <li>・ ゴールまでの距離：</li>
-                <li>・ 職業：</li>
-                <li>・ 所持金：</li>
+                <li>・ 職業：<span id="stat-job">-</span></li>
+                <li>・ 所持金：<span id="stat-money">-</span></li>
                 <li>・ 配偶者の有無：</li>
                 <li>・ 子供の数：</li>
                 <li>・ 持ち会社：</li>
