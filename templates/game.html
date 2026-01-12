@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>人生ゲーム - プレイ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='base-style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body class="game-page">
@@ -42,7 +43,7 @@
             </details>
             <details>
                 <summary>株式売買</summary>
-                <p>購入、または売却したい銘柄と数量を指定してください。売却の際に-1を入力すると全株を売却できます。</p>
+                <p>購入、または売却したい銘柄と数量を指定してください。-1を入力すると買えるだけ購入、もしくは全株を売却できます。</p>
                 <select id="stockName">
                     <option value="STOCK_A">STOCK_A</option>
                     <option value="STOCK_B">STOCK_B</option>
@@ -50,14 +51,13 @@
                     <option value="STOCK_D">STOCK_D</option>
                     <option value="STOCK_E">STOCK_E</option>
                 </select>
-                <input type="number" id="stockAmount" value="1" min="1">
+                <input type="number" id="stockAmount" value="1" min="-1">
                 <button onclick="buyStock()">購入</button>
                 <button onclick="sellStock()">売却</button>
                 <div id="tradeResult"></div>
-            </details>
-            <details>
+
                 <div class="box-border">
-                    <h3>株価推移</h3>
+                    <h3>現在までの推移</h3>
                     <canvas id="stockChart" width="400" height="200"></canvas>
                 </div>
             </details>
@@ -97,17 +97,32 @@
             const es = new EventSource("/roulette/stream");
 
             es.onmessage = (e) => {
-                if (e.data.startsWith("RESULT")) {
-                    es.close();
-                    isSpinning = false;
+                const angle = parseFloat(e.data);
+                if (Number.isNaN(angle)) return;
 
-                    syncCurrentUserStatus();
-                    return;
-                }
+                wheel.style.transform = `rotate(${angle}deg)`;
+            };
 
-                wheel.style.transform = `rotate(${parseFloat(e.data)}deg)`;
+            es.onerror = () => {
+                // SSE終了 = 演出終了
+                es.close();
+
+                fetch("/api/roulette/result", { method: "POST" })
+                    .then(res => res.json())
+                    .then(data => {
+                        console.log("進んだマス:", data.step);
+                        syncCurrentUserStatus();
+                    })
+                    .finally(async () => {
+                        isSpinning = false;
+                        await syncCurrentDay();
+                        loadStockChart();
+                        syncTurn();
+                    });
+
             };
         };
+
 
 
         function loadUsers() {
@@ -120,12 +135,13 @@
                         const btn = document.createElement("button");
                         btn.textContent = u.name;
                         btn.className = "user-link";
-                        btn.onclick = () => loadUserStatus(u.id);
+                        btn.onclick = () => loadUserStatus(u.user_id);
                         li.appendChild(btn);
                         userList.appendChild(li);
                     });
                 });
         }
+
 
         // 3秒ごとに同期
         setInterval(loadUsers, 3000);
@@ -192,6 +208,8 @@
         window.addEventListener("load", () => {
             currentViewingUserId = myUserId;
             loadUserStatus(myUserId);
+            syncCurrentDay();
+            loadStockChart();
         });
 
         function buyStock() {
@@ -240,24 +258,81 @@
                 });
         }
 
+        const TOTAL_DAYS = 132;
+        const PREVIOUS_DAYS = 50;
+        const PAST_DAYS = 50;
         let stockChart = null;
+        let selectedChartStock = "STOCK_A";
+        let xMin = 1;
+        let xMax = TOTAL_DAYS;
+
+        let currentDay = PREVIOUS_DAYS; // 初期値（ゲーム開始前の日数分）
+
+        async function syncCurrentDay() {
+            const res = await fetch(`/api/user/${myUserId}`);
+            const user = await res.json();
+
+            currentDay = user.spot_id + PREVIOUS_DAYS + 1;
+        }
+
+
+        document
+            .getElementById("stockName")
+            .addEventListener("change", e => {
+                selectedChartStock = e.target.value;
+                loadStockChart(); // 即再描画
+            });
+
+        function padPrices(prices) {
+            const padded = Array(TOTAL_DAYS + PREVIOUS_DAYS).fill(null);
+            prices.forEach((v, i) => {
+                if (i < TOTAL_DAYS + PREVIOUS_DAYS) padded[i] = v;
+            });
+            return padded;
+        }
 
         async function loadStockChart() {
             const res = await fetch("/api/stock/prices");
             const data = await res.json();
 
+            const xMinDynamic = Math.max(1, currentDay - PAST_DAYS);
+            const xMaxDynamic = currentDay;
+
             const ctx = document.getElementById("stockChart").getContext("2d");
 
-            const datasets = Object.entries(data.prices).map(([name, prices]) => ({
-                label: name,
-                data: prices,
-                borderWidth: 2,
-                tension: 0.3
-            }));
+            const labels = Array.from(
+                { length: TOTAL_DAYS + PREVIOUS_DAYS },
+                (_, i) => {
+                    const day = i + 1;                // マス目（日数）
+                    const diff = day - currentDay;    // 現在との差
+
+                    if (diff === 0) return "今日";
+                    if (diff < 0) return `${Math.abs(diff)}日前`;
+                    return `${diff}日後`;
+                }
+            );
+
+
+            const datasets = Object.entries(data.prices)
+                .filter(([name]) =>
+                    selectedChartStock === "ALL" || name === selectedChartStock
+                )
+                .map(([name, prices]) => ({
+                    label: name,
+                    data: padPrices(prices),
+                    borderWidth: 2,
+                    tension: 0.3,
+                    spanGaps: true,
+                    pointRadius: 2,
+                    pointHoverRadius: 3
+                }));
+
 
             if (stockChart) {
-                stockChart.data.labels = data.days;
+                stockChart.data.labels = labels;
                 stockChart.data.datasets = datasets;
+                stockChart.options.scales.x.min = xMinDynamic;
+                stockChart.options.scales.x.max = xMaxDynamic;
                 stockChart.update();
                 return;
             }
@@ -265,29 +340,49 @@
             stockChart = new Chart(ctx, {
                 type: "line",
                 data: {
-                    labels: data.days,
+                    labels: labels,
                     datasets: datasets
                 },
                 options: {
                     responsive: true,
                     animation: false,
+
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const label = context.dataset.label || "";
+                                    const value = context.parsed.y;
+
+                                    if (value == null) return label;
+
+                                    return `${label}: ¥${value.toFixed(0)}`;
+                                }
+                            }
+                        }
+                    },
+
                     scales: {
                         x: {
+                            min: xMinDynamic,
+                            max: xMaxDynamic,
                             title: {
                                 display: true,
-                                text: "日数"
+                                text: "日数(日目)"
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: "株価"
+                                text: "株価(￥)"
                             }
                         }
                     }
                 }
+
             });
         }
+
         setInterval(loadStockChart, 2000);
         loadStockChart();
     </script>

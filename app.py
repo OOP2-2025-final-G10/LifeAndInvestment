@@ -13,6 +13,11 @@ from flask import jsonify
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
+total_days = 134 #ゲーム全体の日数(マス目の総数)
+previous_days = 50 #ゲーム開始前の日数(株価表示用)
+
+
+
 users = {}
 
 def init_db():
@@ -52,30 +57,36 @@ def init_db():
     db.commit()
     db.close()
 
-
-init_db()
-
 #セッションリセット用
 @app.route("/reset")
 def reset_session():
-    # セッション（このクライアントの cookie）をクリア
+    db = get_db()
+    try:
+        # 全ユーザー削除
+        db.execute("DELETE FROM users")
+
+        # ゲーム状態を完全初期化
+        db.execute("""
+            UPDATE game_state
+            SET
+                status = 'waiting',
+                turn_user_id = NULL,
+                turn_number = 0,
+                daily_prices = NULL
+            WHERE id = 1
+        """)
+
+        db.commit()
+    finally:
+        db.close()
+
+    # 全セッション破棄（進行中ユーザーも強制退出）
     session.clear()
 
-    # DB のリセット：users を削除し、game_state を初期状態に戻す
-    db = get_db()
-    db.execute("DELETE FROM users")
-    # game_state を初期状態に戻す（存在しなければ作る）
-    db.execute("DELETE FROM game_state")
-    db.execute("""
-    INSERT OR REPLACE INTO game_state
-    (id, status, turn_user_id, turn_number)
-    VALUES (1, 'waiting', NULL, 0)
-""")
+    init_db()
 
-    db.commit()
-    db.close()
+    return redirect(url_for("index"))
 
-    return redirect("/")
 
 
 #参加画面
@@ -218,7 +229,7 @@ def ready():
             "SELECT id FROM users ORDER BY rowid ASC LIMIT 1"
         ).fetchone()
 
-        daily_prices = generate_stock_prices(T=180)
+        daily_prices = generate_stock_prices(T=total_days + previous_days)
         daily_prices_json = json.dumps(daily_prices)
 
         db.execute("""
@@ -241,79 +252,71 @@ def roulette_stream():
     if not user_id:
         return "", 403
 
-    db = get_db()
-
-    state = db.execute("""
-        SELECT status, turn_user_id, daily_prices
-        FROM game_state
-        WHERE id = 1
-    """).fetchone()
-
-    if not state or state["status"] != "playing":
-        db.close()
-        return "", 403
-
-    if state["turn_user_id"] != user_id:
-        db.close()
-        return "", 403
-
-    user_row = db.execute(
-        "SELECT * FROM users WHERE id = ?",
-        (user_id,)
-    ).fetchone()
-
-    user = User.from_row(user_row)
-
     def event_stream():
-        for data in RouletteService.spin_stream():
-            if isinstance(data, float):
-                yield f"data:{data}\n\n"
-                continue
+        # ルーレット演出専用（DBアクセス禁止）
+        for angle in RouletteService.spin_stream():
+            yield f"data:{angle}\n\n"
 
-            step = int(data.split(":")[1])
+    return Response(
+        event_stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
-            db = get_db()
-            try:
-                user_row = db.execute(
-                    "SELECT * FROM users WHERE id = ?",
-                    (user_id,)
-                ).fetchone()
+@app.post("/api/roulette/result")
+def roulette_result():
+    user_id = session.get("user_id")
+    if not user_id:
+        return {"error": "unauthorized"}, 403
 
-                user = User.from_row(user_row)
-                user.spot_id += step
+    db = get_db()
+    try:
+        state = db.execute(
+            "SELECT turn_user_id FROM game_state WHERE id = 1"
+        ).fetchone()
 
-                SpotEventService.handle(user, db)
-                TurnService.next_turn(db)
+        if not state or state["turn_user_id"] != user_id:
+            return {"error": "not your turn"}, 403
 
-                user.save(db)
-                db.commit()
-            finally:
-                db.close()
+        step = RouletteService.consume_result()
 
-            yield f"data:{data}\n\n"
-            return
-    return Response(event_stream(), mimetype="text/event-stream")
+        user = User.get_by_id(db, user_id)
+        user.spot_id += step
+
+        SpotEventService.handle(user, db)
+        user.save(db)
+
+        TurnService.next_turn(db)
+        db.commit()
+
+        return {
+            "step": step,
+            "spot_id": user.spot_id
+        }
+    finally:
+        db.close()
 
 @app.route("/api/users")
 def api_users():
     db = get_db()
-    rows = db.execute("""
-        SELECT id, name, spot_id
-        FROM users
-        ORDER BY rowid ASC
-    """).fetchall()
+    rows = db.execute(
+        "SELECT id, name FROM users"
+    ).fetchall()
     db.close()
 
-    return {
+    return jsonify({
         "users": [
             {
-                "id": r["id"],
-                "name": r["name"],
-                "spot_id": r["spot_id"]
+                "user_id": r["id"],
+                "name": r["name"]
             }
             for r in rows
         ]
-    }
+    })
+
 
 @app.route("/api/user/<user_id>")
 def api_user_detail(user_id):
@@ -407,6 +410,46 @@ def get_daily_prices(db):
     if not row or not row["daily_prices"]:
         return None
     return json.loads(row["daily_prices"])
+
+@app.route("/api/stock/prices")
+def api_stock_prices():
+    user_id = session.get("user_id")
+    if not user_id:
+        return {"error": "unauthorized"}, 403
+
+    db = get_db()
+
+    user_row = db.execute(
+        "SELECT spot_id FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+
+    state_row = db.execute(
+        "SELECT daily_prices FROM game_state WHERE id = 1"
+    ).fetchone()
+
+    db.close()
+
+    if not user_row or not state_row or not state_row["daily_prices"]:
+        return {"error": "data not found"}, 404
+
+    spot_id = user_row["spot_id"]
+    daily_prices = json.loads(state_row["daily_prices"])
+
+    stock_names = ["STOCK_A", "STOCK_B", "STOCK_C", "STOCK_D", "STOCK_E"]
+
+    sliced = daily_prices[:spot_id + previous_days + 1]
+
+    result = {
+        name: [day[i] for day in sliced]
+        for i, name in enumerate(stock_names)
+    }
+
+    return jsonify({
+        "days": list(range(len(sliced))),
+        "prices": result
+    })
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
