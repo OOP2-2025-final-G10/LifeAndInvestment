@@ -142,8 +142,8 @@ body {
     overflow: hidden; /* はみ出た画像を隠す */
 
     /* 背景画像設定 */
-    background-image: url('BoardGame_map.png');
-    background-size: 100% 100%; 
+    background-image: url('BoardGame_map4 1.png');
+    background-size: 105% 105%; 
 
     background-position: center;
     background-repeat: no-repeat;
@@ -177,7 +177,7 @@ body {
 }
 
 .roulette-container {
-    width: 180px;
+    width: 400px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -213,6 +213,43 @@ body {
     line-height: 2.5;
 }
 
+.roulette-wrapper {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    aspect-ratio: 1 / 1;
+}
+
+#roulette {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transform-origin: 50% 50%;
+    transition: transform 0.02s linear;
+}
+
+.roulette-pointer {
+    position: absolute;
+    top: -0px;
+    left: 65%;
+    transform: translateX(-50%) rotate(200deg);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 18px solid red;
+    z-index: 10;
+}
+
+.roulette-circle.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.roulette-circle {
+    transition: opacity 0.3s;
+}
+
 .user-link {
     background: none;
     border: none;
@@ -221,4 +258,69 @@ body {
     color: #333;
     text-decoration: underline;
     margin-bottom: 5px;
+}
+
+
+/* ===== マス目ツールチップ ===== */
+/* ===== マ目ツールチップ（修正版） ===== */
+
+.board-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20; /* 画像(デフォルト0〜10)より確実に上にする */
+}
+
+.tooltip-wrapper.square {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    pointer-events: auto;
+    background: rgba(255, 0, 0, 0.5); /* 確認用：赤い四角が見えるかチェック */
+    z-index: 30;
+}
+
+.tooltip {
+    position: absolute;
+    bottom: 120%; /* マスの少し上に出す */
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+
+    background: #fff;
+    border: 2px solid #333;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    border-radius: 6px;
+
+    /* 表示・非表示の切り替え */
+    visibility: hidden; 
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+}
+
+/* 吹き出しの三角 */
+.tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+/* 【重要】ホバー設定：wrapperに乗ったら中のtooltipを出す */
+.tooltip-wrapper:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* 給料日マス強調（お好みで） */
+.square.salary {
+    box-shadow: 0 0 8px #f39c12;
 }
