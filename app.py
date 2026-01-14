@@ -16,8 +16,6 @@ app.secret_key = "secret_key"
 total_days = 134 #ゲーム全体の日数(マス目の総数)
 previous_days = 50 #ゲーム開始前の日数(株価表示用)
 
-
-
 users = {}
 
 def init_db():
@@ -436,7 +434,7 @@ def api_stock_prices():
     spot_id = user_row["spot_id"]
     daily_prices = json.loads(state_row["daily_prices"])
 
-    stock_names = ["STOCK_A", "STOCK_B", "STOCK_C", "STOCK_D", "STOCK_E"]
+    stock_names = ["東葉電気", "Novasystems", "関東食品", "南日本旅客鉄道", "林不動産レジデンシャル"]
 
     sliced = daily_prices[:spot_id + previous_days + 1]
 

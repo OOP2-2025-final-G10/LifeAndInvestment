@@ -7,22 +7,22 @@ def generate_stock_prices(T: int):
 
     time_scale = T / 100
 
-    stock_names = ["STOCK_A", "STOCK_B", "STOCK_C", "STOCK_D", "STOCK_E"]
+    stock_names = ["東葉電気", "Novasystems", "関東食品", "南日本旅客鉄道", "林不動産レジデンシャル"]
 
     price_base = {
-        "STOCK_A": np.random.uniform(0, 10000),
-        "STOCK_B": np.random.uniform(10000, 20000),
-        "STOCK_C": np.random.uniform(0, 2000),
-        "STOCK_D": np.random.uniform(3000, 6000),
-        "STOCK_E": np.random.uniform(2000, 7000)
+        stock_names[0]: np.random.uniform(0, 10000),
+        stock_names[1]: np.random.uniform(10000, 20000),
+        stock_names[2]: np.random.uniform(0, 2000),
+        stock_names[3]: np.random.uniform(3000, 6000),
+        stock_names[4]: np.random.uniform(2000, 7000)
     }
 
     price_multipliers = {
-        "STOCK_A": price_base["STOCK_A"] / 1000,
-        "STOCK_B": price_base["STOCK_B"] / 1000,
-        "STOCK_C": price_base["STOCK_C"] / 1000,
-        "STOCK_D": price_base["STOCK_D"] / 1000,
-        "STOCK_E": price_base["STOCK_E"] / 1000
+        stock_names[0]: price_base[stock_names[0]] / 1000,
+        stock_names[1]: price_base[stock_names[1]] / 1000,
+        stock_names[2]: price_base[stock_names[2]] / 1000,
+        stock_names[3]: price_base[stock_names[3]] / 1000,
+        stock_names[4]: price_base[stock_names[4]] / 1000
     }
 
 

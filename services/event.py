@@ -9,12 +9,21 @@ previous_days = 50 #ゲーム開始前の日数(株価表示用)
 BROKER_FEE_RATE = 0.005
 MIN_BROKER_FEE = 100
 
+stock_names = ["東葉電気", "Novasystems", "関東食品", "南日本旅客鉄道", "林不動産レジデンシャル"]
+
 class UserEvent:
 
-    #所持金を増加または減少させる
+    #所持金を増加させる
     @staticmethod
     def add_money(user: User, amount: int):
-        user.money += amount
+        if amount > 0:
+            user.money += amount
+
+    #所持金を減少させる
+    @staticmethod
+    def subtract_money(user: User, amount: int):
+        if amount > 0:
+            user.money -= amount
 
     #職業を変更する
     @staticmethod
@@ -36,7 +45,6 @@ class UserEvent:
         amount: int,
         db
     ):
-        stock_names = ["STOCK_A", "STOCK_B", "STOCK_C", "STOCK_D", "STOCK_E"]
 
         # --- 入力チェック ---
         if amount < -1:
@@ -112,7 +120,6 @@ class UserEvent:
         amount: int,
         db
     ):
-        stock_names = ["STOCK_A", "STOCK_B", "STOCK_C", "STOCK_D", "STOCK_E"]
         if amount < -1:
             return {"sold": False, "reason": "不正な値です"}
         
@@ -131,7 +138,7 @@ class UserEvent:
             return {"sold": False, "reason": "price data not found"}
     
         day = user.spot_id
-        if day >= len(daily_prices):
+        if day > total_days:
             day = total_days - 1
 
         day += previous_days
