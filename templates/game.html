@@ -45,11 +45,11 @@
                 <summary>株式売買</summary>
                 <p>購入、または売却したい銘柄と数量を指定してください。-1を入力すると買えるだけ購入、もしくは全株を売却できます。</p>
                 <select id="stockName">
-                    <option value="STOCK_A">STOCK_A</option>
-                    <option value="STOCK_B">STOCK_B</option>
-                    <option value="STOCK_C">STOCK_C</option>
-                    <option value="STOCK_D">STOCK_D</option>
-                    <option value="STOCK_E">STOCK_E</option>
+                    <option value="東葉電気">東葉電気</option>
+                    <option value="Novasystems">Novasystems</option>
+                    <option value="関東食品">関東食品</option>
+                    <option value="南日本旅客鉄道">南日本旅客鉄道</option>
+                    <option value="林不動産レジデンシャル">林不動産レジデンシャル</option>
                 </select>
                 <input type="number" id="stockAmount" value="1" min="-1">
                 <button onclick="buyStock()">購入</button>
@@ -262,7 +262,7 @@
         const PREVIOUS_DAYS = 50;
         const PAST_DAYS = 50;
         let stockChart = null;
-        let selectedChartStock = "STOCK_A";
+        let selectedChartStock = "東葉電気";
         let xMin = 1;
         let xMax = TOTAL_DAYS;
 
@@ -356,7 +356,7 @@
 
                                     if (value == null) return label;
 
-                                    return `${label}: ¥${value.toFixed(0)}`;
+                                    return `${label}: ¥${value.toFixed(2)}`;
                                 }
                             }
                         }
