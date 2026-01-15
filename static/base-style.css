@@ -277,7 +277,7 @@ body {
     height: 25px;
     cursor: pointer;
     pointer-events: auto;
-    background: rgba(255, 0, 0, 0.5); /* 確認用：赤い四角が見えるかチェック */
+    
     z-index: 30;
 }
 
