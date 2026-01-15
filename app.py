@@ -15,6 +15,7 @@ app = Flask(__name__)
 app.secret_key = "secret_key"
 
 total_days = 134 #ゲーム全体の日数(マス目の総数)
+GOAL_SPOT_ID = 134  # ゴールのスポットID
 previous_days = 50 #ゲーム開始前の日数(株価表示用)
 
 users = {}
@@ -43,7 +44,8 @@ def init_db():
             status TEXT NOT NULL,
             turn_user_id TEXT,
             turn_number INTEGER NOT NULL,
-            daily_prices TEXT
+            daily_prices TEXT,
+            winner_user_id TEXT
         )
     """)
 
@@ -283,21 +285,42 @@ def roulette_result():
         step = RouletteService.consume_result()
 
         user = User.get_by_id(db, user_id)
-        spot_id_before = user.spot_id
+        if not user:
+             return {"error": "user not found"}, 404
 
-        SpotEventService.handle(user, spot_id_before, db)
-
+        # 現在のマスから移動
         user.spot_id += step
 
-        user.save(db)
+        # ゴール判定
+        if user.spot_id >= GOAL_SPOT_ID:
+            user.spot_id = GOAL_SPOT_ID
+            user.is_finished = 1
+            
+            # 何番目のゴールか計算
+            finished_count = db.execute("SELECT COUNT(*) FROM users WHERE is_finished = 1").fetchone()[0]
+            user.goal_order = finished_count + 1
+            
+            # ゲーム終了ステータスの更新（必要に応じて）
+            db.execute("UPDATE game_state SET status = 'finished', winner_user_id = ? WHERE id = 1", (user.user_id,))
 
+        # マス目のイベント処理
+        SpotEventService.handle(user, user.spot_id, db)
+
+        # データベースに保存
+        user.save(db)
+        
+        # 次の人のターンへ
         TurnService.next_turn(db)
         db.commit()
 
         return {
             "step": step,
-            "spot_id": user.spot_id
+            "spot_id": user.spot_id,
+            "is_finished": user.is_finished
         }
+    except Exception as e:
+        print(f"Error: {e}")
+        return {"error": "internal server error"}, 500
     finally:
         db.close()
 
