@@ -290,7 +290,6 @@ def roulette_result():
             return {"error": "already_goal"}, 403
 
         step = RouletteService.consume_result()
-        print("aaaaaaaaa")
 
         spot_id_before = user.spot_id
         SpotEventService.handle(user, spot_id_before, db)
