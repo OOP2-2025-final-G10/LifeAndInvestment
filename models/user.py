@@ -11,7 +11,7 @@ class User:
         money: int,
         job: Job | None,
         holdings: dict[str, int] | None = None,
-        last_salary: int = 0
+        last_salary: int = 0,
     ):
         self.user_id = id
         self.spot_id = spot_id
@@ -47,25 +47,12 @@ class User:
         )
 
     def save(self, db):
-        db.execute(
-            """
-            UPDATE users
-            SET
-                money = ?,
-                job = ?,
-                spot_id = ?,
-                holdings = ?
-            WHERE id = ?
-            """,
-            (
-                self.money,
-                self.job.name if self.job else None,
-                self.spot_id,
-                json.dumps(self.holdings, ensure_ascii=False),
-                self.user_id
-            )
-        )
-    
+            db.execute("""
+        UPDATE users
+        SET name = ?, money = ?, job = ?, spot_id = ?, is_ready = ?, holdings = ?, is_finished = ?, goal_order = ?  -- 追加
+        WHERE id = ?
+    """, (self.name, self.money, self.job, self.spot_id, self.is_ready, self.holdings, self.is_finished, self.goal_order, self.id))
+                
     @staticmethod
     def get_by_id(db, user_id: str):
         row = db.execute(

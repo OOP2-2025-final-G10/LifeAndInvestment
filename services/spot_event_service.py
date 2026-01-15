@@ -307,6 +307,11 @@ class SpotEventService:
                 UserEvent.subtract_money(user, 40000000)
             case 134: # 【ゴール！】
                 # 順位判定やボーナスは別途ゲームロジックで処理を想定
-                pass
-
+                if user.goal_order == 1:
+                    UserEvent.add_money(user, 100000000)  # 一着: +1億円
+                elif user.goal_order == 2:
+                    UserEvent.add_money(user, 50000000)  # 二着: +5,000万円
+                elif user.goal_order == 3:
+                    UserEvent.add_money(user, 30000000)  # 三着: +3,000万円
+                # 四着以下は報酬なし
         user.save(db)
