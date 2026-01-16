@@ -609,12 +609,41 @@
         loadUsers();
 
         async function syncTurn() {
-            const res = await fetch("/api/game_state");
-            const state = await res.json();
+            try {
+                // 並列で取得（遅延を最小化）
+                const [stateRes, userRes] = await Promise.all([
+                    fetch("/api/game_state", { credentials: "same-origin" }),
+                    fetch(`/api/user/${encodeURIComponent(myUserId)}`, { credentials: "same-origin" })
+                ]);
 
-            const nowMyTurn = state.turn_user_id === myUserId;
-            updateSpinButton(nowMyTurn);
+                if (!stateRes.ok) {
+                    console.error("failed to fetch game_state", stateRes.status);
+                    updateSpinButton(false);
+                    return;
+                }
+                if (!userRes.ok) {
+                    console.error("failed to fetch user data", userRes.status);
+                    updateSpinButton(false);
+                    return;
+                }
+
+                const state = await stateRes.json();
+                const user = await userRes.json();
+
+                // サーバ側の定義に合わせる:
+                // - 自分のターンであること
+                // - かつゴールしていないこと（goal_order が null / undefined）
+                const notGoal = (user.goal_order === null || user.goal_order === undefined);
+                const nowMyTurn = (state.turn_user_id === myUserId) && notGoal;
+
+                updateSpinButton(nowMyTurn);
+            } catch (err) {
+                console.error("syncTurn error:", err);
+                // エラー時は安全側で無効化
+                updateSpinButton(false);
+            }
         }
+
 
         syncTurn();
         setInterval(syncTurn, 2000);
