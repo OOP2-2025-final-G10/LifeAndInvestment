@@ -1,8 +1,6 @@
-# BoardGameApp（人生ゲーム）
+# Life and Investment
 
-> **🎲 ブラウザで遊べる、多人数参加型 人生すごろくゲーム**
-
-BoardGameApp は、Flask を用いて構築された  
+Life and Investment は、Flask を用いて構築された  
 **複数人同時参加型の人生ゲーム（すごろく）Webアプリケーション**です。
 
 ngrok を使用することで、  
