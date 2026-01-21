@@ -624,7 +624,7 @@
 
 
         function renderUserStatus(user) {
-            statusItems[1].textContent = `・ 現在の位置：${user.spot_id + 1}, ゴールまでの距離：${user.spot_id - 135}`;
+            statusItems[1].textContent = `・ 現在の位置：${user.spot_id + 1}, ゴールまでの距離：${135 - user.spot_id}`;
             statusItems[0].textContent = `ユーザー：${user.name}`;
             statusItems[2].textContent = `・ 職業：${user.job?.name ?? "なし"}`;
             statusItems[3].textContent = `・ 所持金：${user.money}`;
